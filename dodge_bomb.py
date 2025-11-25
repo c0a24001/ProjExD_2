@@ -49,19 +49,16 @@ def game_over(screen:pg.Surface):
     time.sleep(5)
 
 def prep_bombs() -> tuple[list, list]:
-    bb_imgs = [] # 爆弾Surfaceのリスト
+    bb_imgs = [] 
     for r in range(1, 11):
         bb_img = pg.Surface((20*r, 20*r))
         pg.draw.circle(bb_img, (255, 0, 0), (10*r, 10*r), 10*r)
-        bb_img.set_colorkey((0, 0, 0)) # 黒い部分を透過
+        bb_img.set_colorkey((0, 0, 0)) 
         bb_imgs.append(bb_img)
     bb_accs = [a for a in range(1, 11)]
     return bb_imgs, bb_accs
 
 def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
-    """
-    移動量タプルと対応する画像Surfaceの辞書を返す
-    """
     kk_img0 = pg.image.load("fig/3.png") # 元画像
     base_img = pg.transform.rotozoom(kk_img0, 0, 0.9)
     kk_dict = {
@@ -92,7 +89,6 @@ def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
         if y != 0 and x != 0:
             kk_dict[(y, x)] = kk_dict[y, x] # 斜め移動
             
-    # DELTAのキーを元にした合計移動量を網羅
     for y in [0, -5, +5]:
         for x in [0, -5, +5]:
             if (x, y) not in kk_dict:
@@ -120,7 +116,6 @@ def calc_orientation(org: pg.Rect, dst: pg.Rect, current_xy: tuple[float, float]
     diff_x = dst.centerx - org.centerx
     diff_y = dst.centery - org.centery
     
-    # 差ベクトルのノルム(長さ)
     norm = math.sqrt(diff_x**2 + diff_y**2)
     
     # ノルムが0、または200未満の場合の処理
