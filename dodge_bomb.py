@@ -3,6 +3,7 @@ import sys
 import pygame as pg
 import random
 import time
+import math
 
 WIDTH, HEIGHT = 1100, 650
 DELTA = {
@@ -54,17 +55,98 @@ def prep_bombs() -> tuple[list, list]:
         pg.draw.circle(bb_img, (255, 0, 0), (10*r, 10*r), 10*r)
         bb_img.set_colorkey((0, 0, 0)) # 黒い部分を透過
         bb_imgs.append(bb_img)
-        bb_accs = [a for a in range(1, 11)]
-        return bb_imgs, bb_accs
+    bb_accs = [a for a in range(1, 11)]
+    return bb_imgs, bb_accs
+
+def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
+    """
+    移動量タプルと対応する画像Surfaceの辞書を返す
+    """
+    kk_img0 = pg.image.load("fig/3.png") # 元画像
+    kk_dict = {
+        (0, 0): pg.transform.rotozoom(kk_img0, 0, 0.9), # 停止時
+    }
+    # 左右
+    kk_dict[(+5, 0)] = pg.transform.rotozoom(kk_img0, 0, 0.9) # 右
+    kk_dict[(-5, 0)] = pg.transform.rotozoom(kk_img0, 0, 0.9) # 左
+    
+    # 上下
+    kk_dict[(0, -5)] = pg.transform.rotozoom(kk_img0, 90, 0.9) # 上
+    kk_dict[(0, +5)] = pg.transform.rotozoom(kk_img0, -90, 0.9) # 下
+    
+    # 斜め
+    kk_dict[(+5, -5)] = pg.transform.rotozoom(kk_img0, 45, 0.9) # 右上
+    kk_dict[(-5, -5)] = pg.transform.rotozoom(kk_img0, 135, 0.9) # 左上
+    kk_dict[(+5, +5)] = pg.transform.rotozoom(kk_img0, -45, 0.9) # 右下
+    kk_dict[(-5, +5)] = pg.transform.rotozoom(kk_img0, -135, 0.9) # 左下
+
+    # 組み合わせた移動量（合計値）に対するキーも追加
+    for y, x in [(-5, -5), (-5, +5), (+5, -5), (+5, +5)]:
+        # 左右+上下
+        if y != 0 and x != 0:
+            kk_dict[(y, x)] = kk_dict[y, x] # 斜め移動
+            
+    # DELTAのキーを元にした合計移動量を網羅
+    for y in [0, -5, +5]:
+        for x in [0, -5, +5]:
+            if (x, y) not in kk_dict:
+                # 左右の合計、上下の合計
+                if x != 0 and y == 0:
+                    kk_dict[(x, y)] = kk_dict[(x, 0)]
+                elif x == 0 and y != 0:
+                    kk_dict[(x, y)] = kk_dict[(0, y)]
+                elif x != 0 and y != 0:
+                    # 斜めはすでに定義済みだが念のため
+                    pass
+    
+    return kk_dict
+
+def calc_orientation(org: pg.Rect, dst: pg.Rect, current_xy: tuple[float, float]) -> tuple[float, float]:
+    """
+    引数:
+        org: 爆弾Rect (pg.Rect)
+        dst: こうかとんRect (pg.Rect)
+        current_xy: 現在の爆弾の速度ベクトル (vx, vy) (tuple[float, float])
+    戻り値:
+        移動すべき方向ベクトル (vx, vy) (tuple[float, float])
+    """
+    # 爆弾(org)からこうかとん(dst)へのベクトルを求める
+    diff_x = dst.centerx - org.centerx
+    diff_y = dst.centery - org.centery
+    
+    # 差ベクトルのノルム(長さ)
+    norm = math.sqrt(diff_x**2 + diff_y**2)
+    
+    # ノルムが0、または200未満の場合の処理
+    if norm == 0:
+        return current_xy # 停止している場合は現在の速度を維持
+    
+    # 衝突寸前(距離300未満)の場合
+    if norm < 300:
+        # ゲームオーバーにならないように、現在の速度ベクトルを返す
+        return current_xy
+    
+    # 正規化（ノルムを√50に調整）
+    # √50は速度ベクトルのノルム(5, 5)の長さ(5√2)
+    target_norm = math.sqrt(5**2 + 5**2) 
+    
+    vx = diff_x / norm * target_norm
+    vy = diff_y / norm * target_norm
+    
+    # 小数点以下を無視すると水平・垂直に移動してしまうため、floatのまま返す
+    return vx, vy
 
 def main():
     pg.display.set_caption("逃げろ!こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load("fig/pg_bg.jpg")
+    kk_imgs = get_kk_imgs() # こうかとんの画像を辞書として取得
+    kk_img = kk_imgs[(0, 0)] # 初期画像は停止時のもの
     kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 200
     bb_imgs, bb_accs = prep_bombs() #機能2
+    vx, vy = +5.0, +5.0# vx, vyを初期速度として定義し、浮動小数点数で保持
     bb_img = bb_imgs[0]
     bb_rct = bb_img.get_rect() # 爆弾Rect
     bb_rct.centerx = random.randint(0, WIDTH) # 爆弾横座標
@@ -97,11 +179,27 @@ def main():
             if key_lst[key]:
                 sum_mv[0]+=mv[0]
                 sum_mv[1]+=mv[1]
+
+        mv_key = tuple(sum_mv) # 移動量のタプル (vx, vy)
+        if mv_key in kk_imgs:
+            kk_img = kk_imgs[mv_key]
+        elif (mv_key[0], 0) in kk_imgs and mv_key[1] == 0:
+             kk_img = kk_imgs[(mv_key[0], 0)]
+        elif (0, mv_key[1]) in kk_imgs and mv_key[0] == 0:
+             kk_img = kk_imgs[(0, mv_key[1])]
+        else:
+             kk_img = kk_imgs[(0, 0)]
+    
         kk_rct.move_ip(sum_mv)
         if check_bound(kk_rct) != (True, True):  # 画面外なら
            kk_rct.move_ip(-sum_mv[0], -sum_mv[1])  # 移動をなかったことにする
         screen.blit(kk_img, kk_rct)
         level = min(tmr // 500, 9)
+        current_bb_img = bb_imgs[level]
+        bb_rct.width = current_bb_img.get_rect().width
+        bb_rct.height = current_bb_img.get_rect().height
+        vx, vy = calc_orientation(bb_rct, kk_rct, (vx, vy))
+        acc = bb_accs[level]
         avx = vx * bb_accs[level]
         avy = vy * bb_accs[level]
         bb_rct.move_ip(avx, avy) # 爆弾移動は加速後の速度を使用
@@ -112,6 +210,7 @@ def main():
             vy *= -1
 
         current_bb_img = bb_imgs[level]
+
         screen.blit(current_bb_img, bb_rct)
         pg.display.update()
         tmr += 1
