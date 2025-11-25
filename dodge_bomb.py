@@ -63,22 +63,28 @@ def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
     移動量タプルと対応する画像Surfaceの辞書を返す
     """
     kk_img0 = pg.image.load("fig/3.png") # 元画像
+    base_img = pg.transform.rotozoom(kk_img0, 0, 0.9)
     kk_dict = {
         (0, 0): pg.transform.rotozoom(kk_img0, 0, 0.9), # 停止時
     }
     # 左右
-    kk_dict[(+5, 0)] = pg.transform.rotozoom(kk_img0, 0, 0.9) # 右
-    kk_dict[(-5, 0)] = pg.transform.rotozoom(kk_img0, 0, 0.9) # 左
+    kk_dict[(-5, 0)] = pg.transform.rotozoom(kk_img0, 0, 0.9) # 右
+    kk_dict[(+5, 0)] = pg.transform.flip(pg.transform.rotozoom(kk_img0, 0, 0.9), True, False) # 左
+
+    kk_img_right = kk_dict[(+5, 0)]
     
     # 上下
-    kk_dict[(0, -5)] = pg.transform.rotozoom(kk_img0, 90, 0.9) # 上
-    kk_dict[(0, +5)] = pg.transform.rotozoom(kk_img0, -90, 0.9) # 下
+    kk_dict[(0, -5)] = pg.transform.rotozoom(kk_img0, -90, 0.9) # 上
+    kk_dict[(0, +5)] = pg.transform.rotozoom(kk_img0, 90, 0.9) # 下
+
+    flipped_base_img = pg.transform.flip(base_img, True, False)
     
     # 斜め
-    kk_dict[(+5, -5)] = pg.transform.rotozoom(kk_img0, 45, 0.9) # 右上
-    kk_dict[(-5, -5)] = pg.transform.rotozoom(kk_img0, 135, 0.9) # 左上
-    kk_dict[(+5, +5)] = pg.transform.rotozoom(kk_img0, -45, 0.9) # 右下
-    kk_dict[(-5, +5)] = pg.transform.rotozoom(kk_img0, -135, 0.9) # 左下
+    kk_dict[(-5, -5)] = pg.transform.rotozoom(kk_img0, 45, 0.9)
+    kk_dict[(-5, +5)] = pg.transform.rotozoom(kk_img0, 135, 0.9)
+    kk_dict[(+5, -5)] = pg.transform.rotozoom(kk_img0, -45, 0.9)
+    kk_dict[(+5, +5)] = pg.transform.rotozoom(kk_img0, -135, 0.9)
+    
 
     # 組み合わせた移動量（合計値）に対するキーも追加
     for y, x in [(-5, -5), (-5, +5), (+5, -5), (+5, +5)]:
@@ -204,10 +210,10 @@ def main():
         avy = vy * bb_accs[level]
         bb_rct.move_ip(avx, avy) # 爆弾移動は加速後の速度を使用
         yoko, tate = check_bound(bb_rct)
-        if not yoko:  # 横方向にはみ出ていたら
-            vx *= -1
-        if not tate:  # 縦方向にはみ出ていたら
-            vy *= -1
+        #if not yoko:  # 横方向にはみ出ていたら
+        #    vx *= -1
+        #if not tate:  # 縦方向にはみ出ていたら
+        #    vy *= -1
 
         current_bb_img = bb_imgs[level]
 
